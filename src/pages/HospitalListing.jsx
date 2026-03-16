@@ -19,7 +19,6 @@ import SearchIcon from "@mui/icons-material/Search";
 import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 
-
 const hospitals = [
   {
     id: 1,
@@ -89,7 +88,6 @@ const hospitals = [
     specialties: ["Gynecology", "Oncology", "General Surgery"],
     contact: "01-7894567",
   },
-
 ];
 
 const HospitalListing = () => {
