@@ -1,5 +1,3 @@
-// src/pages/DoctorsList.jsx
-
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -14,23 +12,28 @@ import {
   Box,
   Divider,
 } from "@mui/material";
+import { doctors as STATIC_DOCTORS } from "../data/doctors";
+import { hospitals as STATIC_HOSPITALS } from "../data/hospitals";
 
-// Import doctors and hospitals data
-import { doctors } from "../data/doctors";
-import { hospitals } from "../data/hospitals";
-
-const DoctorsList = () => {
+export default function DoctorsList() {
   const { hospitalId } = useParams();
   const navigate = useNavigate();
+  const id = Number(hospitalId);
 
-  // Find the hospital by ID to get its real name
-  const hospital = hospitals.find((h) => h.id === Number(hospitalId));
-  const hospitalName = hospital ? hospital.name : `Hospital ID ${hospitalId}`;
+  // Merge static + admin-added hospitals to get the correct name
+  const allHospitals = [
+    ...STATIC_HOSPITALS,
+    ...JSON.parse(localStorage.getItem("hospitals") || "[]"),
+  ];
+  const hospital = allHospitals.find((h) => h.id === id);
+  const hospitalName = hospital?.name || "Unknown Hospital";
 
-  // Filter doctors for this hospital
-  const hospitalDoctors = doctors.filter(
-    (doc) => doc.hospitalId === Number(hospitalId),
-  );
+  // Merge static + admin-added doctors, then filter by hospital
+  const allDoctors = [
+    ...STATIC_DOCTORS,
+    ...JSON.parse(localStorage.getItem("doctors") || "[]"),
+  ];
+  const hospitalDoctors = allDoctors.filter((d) => d.hospitalId === id);
 
   if (hospitalDoctors.length === 0) {
     return (
@@ -40,7 +43,6 @@ const DoctorsList = () => {
         </Typography>
         <Button
           variant="contained"
-          color="primary"
           sx={{ mt: 3 }}
           onClick={() => navigate("/")}
         >
@@ -55,12 +57,9 @@ const DoctorsList = () => {
       <Typography
         variant="h4"
         align="center"
-        gutterBottom
-        sx={{
-          fontWeight: "bold",
-          color: "#1976d2",
-          mb: 6,
-        }}
+        fontWeight="bold"
+        color="primary"
+        sx={{ mb: 6 }}
       >
         Doctors at {hospitalName}
       </Typography>
@@ -75,7 +74,6 @@ const DoctorsList = () => {
                 display: "flex",
                 flexDirection: "column",
                 borderRadius: 3,
-                overflow: "hidden",
                 transition: "all 0.3s",
                 "&:hover": {
                   transform: "translateY(-8px)",
@@ -83,46 +81,53 @@ const DoctorsList = () => {
                 },
               }}
             >
-              <CardMedia
-                component="img"
-                height="260"
-                image={doctor.image}
-                alt={doctor.name}
-                sx={{ objectFit: "cover" }}
-              />
+              {doctor.image ? (
+                <CardMedia
+                  component="img"
+                  height="240"
+                  image={doctor.image}
+                  alt={doctor.name}
+                  sx={{ objectFit: "cover" }}
+                />
+              ) : (
+                <Box
+                  sx={{
+                    height: 240,
+                    bgcolor: "#e3f2fd",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Typography fontSize="5rem">👨‍⚕️</Typography>
+                </Box>
+              )}
 
               <CardContent sx={{ flexGrow: 1, p: 3 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
                   {doctor.name}
                 </Typography>
-
                 <Typography variant="subtitle1" color="primary" gutterBottom>
                   {doctor.specialty}
                 </Typography>
-
-                <Divider sx={{ my: 2 }} />
-
+                <Divider sx={{ my: 1.5 }} />
                 <Typography
                   variant="body2"
                   color="text.secondary"
-                  sx={{ mb: 1 }}
+                  sx={{ mb: 0.5 }}
                 >
-                  <strong>Experience:</strong> {doctor.experience}
+                  <strong>Experience:</strong> {doctor.experience || "N/A"}
                 </Typography>
-
                 <Typography variant="body2" color="text.secondary">
-                  <strong>Availability:</strong> {doctor.availability}
+                  <strong>Availability:</strong> {doctor.availability || "N/A"}
                 </Typography>
               </CardContent>
 
               <CardActions sx={{ p: 3, pt: 0 }}>
                 <Button
                   variant="contained"
-                  color="primary"
                   fullWidth
-                  size="large"
                   onClick={() => navigate(`/doctor/${doctor.id}`)}
-                  sx={{ py: 1.5 }}
                 >
                   View Profile
                 </Button>
@@ -132,18 +137,11 @@ const DoctorsList = () => {
         ))}
       </Grid>
 
-      <Box sx={{ textAlign: "center", mt: 8 }}>
-        <Button
-          variant="outlined"
-          color="primary"
-          size="large"
-          onClick={() => navigate("/")}
-        >
+      <Box sx={{ textAlign: "center", mt: 6 }}>
+        <Button variant="outlined" size="large" onClick={() => navigate("/")}>
           Back to Hospitals
         </Button>
       </Box>
     </Container>
   );
-};
-
-export default DoctorsList;
+}
