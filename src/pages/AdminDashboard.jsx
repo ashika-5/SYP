@@ -27,6 +27,10 @@ import {
   DialogActions,
   TextField,
   IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
@@ -35,307 +39,315 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { hospitals as DEFAULT_HOSPITALS } from "../data/hospitals";
+import { doctors as STATIC_DOCTORS } from "../data/doctors";
 
-// Status chip helper
-const getStatusChip = (status) => {
-  const colors = {
-    Scheduled: "warning",
-    Completed: "success",
-    Cancelled: "error",
-  };
-  return (
-    <Chip
-      label={status || "Scheduled"}
-      color={colors[status] || "default"}
-      size="small"
-      sx={{ fontWeight: "medium" }}
-    />
-  );
+const load = (key, fallback = []) => {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || fallback;
+  } catch {
+    return fallback;
+  }
 };
 
-const AdminDashboard = () => {
+const StatusChip = ({ status }) => {
+  const color =
+    { Scheduled: "warning", Completed: "success", Cancelled: "error" }[
+      status
+    ] || "default";
+  return <Chip label={status || "Scheduled"} color={color} size="small" />;
+};
+
+const THead = ({ cols }) => (
+  <TableHead>
+    <TableRow>
+      {cols.map((c) => (
+        <TableCell key={c}>
+          <strong>{c}</strong>
+        </TableCell>
+      ))}
+    </TableRow>
+  </TableHead>
+);
+
+const EMPTY_FORM = {
+  name: "",
+  location: "",
+  specialties: "",
+  contact: "",
+  specialty: "",
+  hospitalId: "",
+  experience: "",
+  qualification: "",
+  availability: "",
+  bio: "",
+  image: "",
+};
+
+const SIDEBAR_ITEMS = [
+  { label: "Dashboard", value: "dashboard", icon: <DashboardIcon /> },
+  { label: "Hospitals", value: "hospitals", icon: <LocalHospitalIcon /> },
+  { label: "Doctors", value: "doctors", icon: <PersonIcon /> },
+  { label: "Appointments", value: "appointments", icon: <CalendarMonthIcon /> },
+];
+
+export default function AdminDashboard() {
   const navigate = useNavigate();
 
-  // Protect route 
+  // Redirect if not logged in
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem("isAdminLoggedIn");
-    if (isLoggedIn !== "true") {
+    if (localStorage.getItem("isAdminLoggedIn") !== "true")
       navigate("/admin/login");
-    }
   }, [navigate]);
 
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [tab, setTab] = useState("dashboard");
+  const [adminDoctors, setAdminDoctors] = useState(() => load("doctors"));
+  const [appointments, setAppointments] = useState(() => load("appointments"));
+  const [modal, setModal] = useState({ open: false, type: "", item: null });
+  const [form, setForm] = useState(EMPTY_FORM);
 
-  // Load data from localStorage
   const [hospitals, setHospitals] = useState(() => {
-    const saved = localStorage.getItem("hospitals");
-    return saved
-      ? JSON.parse(saved)
-      : [
-          { id: 1, name: "City Care Hospital", location: "Kathmandu" },
-          { id: 2, name: "Green Valley Medical Center", location: "Pokhara" },
-          { id: 3, name: "Sunrise Hospital", location: "Lalitpur" },
-        ];
+    const defaultIds = new Set(DEFAULT_HOSPITALS.map((h) => h.id));
+    const extra = load("hospitals").filter((h) => !defaultIds.has(h.id));
+    return [...DEFAULT_HOSPITALS, ...extra];
   });
 
-  const [doctors, setDoctors] = useState(() => {
-    const saved = localStorage.getItem("doctors");
-    return saved
-      ? JSON.parse(saved)
-      : [
-          { id: 101, name: "Dr. Aashish Das", specialty: "Cardiology" },
-          { id: 102, name: "Dr. Neha Sharma", specialty: "Neurology" },
-          { id: 103, name: "Dr. Suman Thapa", specialty: "Orthopedics" },
-        ];
-  });
+  const allDoctors = [...STATIC_DOCTORS, ...adminDoctors];
 
-  const [appointments, setAppointments] = useState(() => {
-    const saved = localStorage.getItem("appointments");
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Save to localStorage whenever data changes
   useEffect(() => {
-    localStorage.setItem("hospitals", JSON.stringify(hospitals));
-    localStorage.setItem("doctors", JSON.stringify(doctors));
+    const defaultIds = new Set(DEFAULT_HOSPITALS.map((h) => h.id));
+    localStorage.setItem(
+      "hospitals",
+      JSON.stringify(hospitals.filter((h) => !defaultIds.has(h.id))),
+    );
+    localStorage.setItem("doctors", JSON.stringify(adminDoctors));
     localStorage.setItem("appointments", JSON.stringify(appointments));
-  }, [hospitals, doctors, appointments]);
+  }, [hospitals, adminDoctors, appointments]);
 
-  // Modal for add/edit
-  const [openModal, setOpenModal] = useState(false);
-  const [modalType, setModalType] = useState(""); // addHospital, editHospital, addDoctor, editDoctor
-  const [currentItem, setCurrentItem] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    location: "",
-    specialty: "",
-  });
-
-  const openModalHandler = (type, item = null) => {
-    setModalType(type);
-    setCurrentItem(item);
-    setFormData({
-      name: item ? item.name : "",
-      location: item?.location || "",
-      specialty: item?.specialty || "",
-    });
-    setOpenModal(true);
+  const openModal = (type, item = null) => {
+    setForm(
+      item
+        ? {
+            ...EMPTY_FORM,
+            ...item,
+            specialties: (item.specialties || []).join(", "),
+          }
+        : EMPTY_FORM,
+    );
+    setModal({ open: true, type, item });
   };
 
   const handleSave = () => {
-    if (!formData.name.trim()) return alert("Name is required");
+    if (!form.name.trim()) return alert("Name is required");
+    const isHospital = modal.type.includes("Hospital");
+    const isAdd = modal.type.includes("add");
 
-    if (modalType === "addHospital") {
-      setHospitals([
-        ...hospitals,
-        { id: Date.now(), name: formData.name, location: formData.location },
-      ]);
-    } else if (modalType === "editHospital") {
+    if (isHospital) {
+      const data = {
+        id: isAdd ? Date.now() : modal.item.id,
+        name: form.name,
+        location: form.location,
+        contact: form.contact || "N/A",
+        specialties: form.specialties
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      };
       setHospitals(
-        hospitals.map((h) =>
-          h.id === currentItem.id ? { ...h, ...formData } : h,
-        ),
+        isAdd
+          ? [...hospitals, data]
+          : hospitals.map((h) => (h.id === data.id ? data : h)),
       );
-    } else if (modalType === "addDoctor") {
-      setDoctors([
-        ...doctors,
-        { id: Date.now(), name: formData.name, specialty: formData.specialty },
-      ]);
-    } else if (modalType === "editDoctor") {
-      setDoctors(
-        doctors.map((d) =>
-          d.id === currentItem.id ? { ...d, ...formData } : d,
-        ),
+    } else {
+      if (!form.hospitalId) return alert("Please select a hospital");
+      const hospital = hospitals.find((h) => h.id === Number(form.hospitalId));
+      if (!hospital) return alert("Hospital not found");
+      const data = {
+        id: isAdd ? Date.now() : modal.item.id,
+        name: form.name,
+        specialty: form.specialty,
+        hospitalId: Number(form.hospitalId),
+        hospitalName: hospital.name,
+        experience: form.experience || "N/A",
+        qualification: form.qualification || "N/A",
+        availability: form.availability || "N/A",
+        bio: form.bio,
+        image: form.image,
+      };
+      setAdminDoctors(
+        isAdd
+          ? [...adminDoctors, data]
+          : adminDoctors.map((d) => (d.id === data.id ? data : d)),
       );
     }
-
-    setOpenModal(false);
+    setModal({ ...modal, open: false });
   };
 
   const handleDelete = (type, id) => {
-    if (window.confirm(`Delete this ${type}?`)) {
-      if (type === "hospital")
-        setHospitals(hospitals.filter((h) => h.id !== id));
-      if (type === "doctor") setDoctors(doctors.filter((d) => d.id !== id));
-    }
+    if (!window.confirm(`Delete this ${type}?`)) return;
+    if (type === "hospital") setHospitals(hospitals.filter((h) => h.id !== id));
+    if (type === "doctor")
+      setAdminDoctors(adminDoctors.filter((d) => d.id !== id));
+    if (type === "appointment")
+      setAppointments(appointments.filter((a) => a.id !== id));
   };
+
+  const field = (key) => ({
+    fullWidth: true,
+    sx: { mt: 2 },
+    value: form[key],
+    onChange: (e) => setForm({ ...form, [key]: e.target.value }),
+  });
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f5f5f5" }}>
-      {/* Sidebar - taller and more spaced */}
-      <Box sx={{ width: 300, bgcolor: "#1a3c5e", color: "white", p: 4 }}>
+      {/* ── Sidebar ── */}
+      <Box
+        sx={{
+          width: 260,
+          bgcolor: "#1a3c5e",
+          color: "white",
+          p: 3,
+          flexShrink: 0,
+        }}
+      >
         <Typography
-          variant="h4"
-          sx={{ mb: 6, fontWeight: "bold", textAlign: "center" }}
+          variant="h6"
+          sx={{ mb: 4, fontWeight: "bold", textAlign: "center" }}
         >
           Admin Dashboard
         </Typography>
-
         <List>
-          {[
-            { label: "Dashboard", value: "dashboard", icon: <DashboardIcon /> },
-            {
-              label: "Hospitals",
-              value: "hospitals",
-              icon: <LocalHospitalIcon />,
-            },
-            { label: "Doctors", value: "doctors", icon: <PersonIcon /> },
-            {
-              label: "Appointments",
-              value: "appointments",
-              icon: <CalendarMonthIcon />,
-            },
-          ].map((item) => (
+          {SIDEBAR_ITEMS.map(({ label, value, icon }) => (
             <ListItem
               button
-              key={item.value}
+              key={value}
+              onClick={() => setTab(value)}
               sx={{
-                bgcolor: activeTab === item.value ? "#2c5282" : "transparent",
-                borderRadius: 2,
-                mb: 2,
-                py: 2,
-                px: 3,
-                transition: "all 0.3s",
-                "&:hover": { bgcolor: "#2c5282" },
+                bgcolor: tab === value ? "#2c5282" : "transparent",
+                borderRadius: 1,
+                mb: 1,
+                cursor: "pointer",
               }}
-              onClick={() => setActiveTab(item.value)}
             >
-              <ListItemIcon sx={{ color: "white", minWidth: 50, fontSize: 30 }}>
-                {item.icon}
+              <ListItemIcon sx={{ color: "white", minWidth: 36 }}>
+                {icon}
               </ListItemIcon>
-              <ListItemText
-                primary={item.label}
-                primaryTypographyProps={{ fontSize: "1.2rem" }}
-              />
+              <ListItemText primary={label} />
             </ListItem>
           ))}
         </List>
+        <Divider sx={{ bgcolor: "rgba(255,255,255,0.2)", my: 2 }} />
+        <Button
+          fullWidth
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            localStorage.removeItem("isAdminLoggedIn");
+            navigate("/admin/login");
+          }}
+        >
+          Logout
+        </Button>
       </Box>
 
-      {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 4, md: 6 }, pb: 12 }}>
-        <Typography variant="h3" fontWeight="bold" gutterBottom sx={{ mb: 6 }}>
-          {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-        </Typography>
-
-        {/* Dashboard */}
-        {activeTab === "dashboard" && (
-          <Grid container spacing={4} sx={{ mb: 8 }}>
-            <Grid item xs={12} sm={6} md={4}>
-              <Card
-                elevation={6}
-                sx={{ bgcolor: "#e3f2fd", height: "100%", borderRadius: 3 }}
-              >
-                <CardContent sx={{ textAlign: "center", py: 6 }}>
-                  <Typography variant="h2" color="primary" fontWeight="bold">
-                    {hospitals.length}
-                  </Typography>
-                  <Typography
-                    variant="h5"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
-                    Total Hospitals
-                  </Typography>
-                </CardContent>
-              </Card>
+      {}
+      <Box sx={{ flex: 1, p: 4, overflow: "auto" }}>
+        {}
+        {tab === "dashboard" && (
+          <>
+            <Typography variant="h5" fontWeight="bold" sx={{ mb: 3 }}>
+              Overview
+            </Typography>
+            <Grid container spacing={3}>
+              {[
+                {
+                  label: "Hospitals",
+                  value: hospitals.length,
+                  color: "#1976d2",
+                  icon: <LocalHospitalIcon sx={{ fontSize: 40 }} />,
+                },
+                {
+                  label: "Doctors",
+                  value: allDoctors.length,
+                  color: "#388e3c",
+                  icon: <PersonIcon sx={{ fontSize: 40 }} />,
+                },
+                {
+                  label: "Appointments",
+                  value: appointments.length,
+                  color: "#f57c00",
+                  icon: <CalendarMonthIcon sx={{ fontSize: 40 }} />,
+                },
+              ].map(({ label, value, color, icon }) => (
+                <Grid item xs={12} sm={4} key={label}>
+                  <Card elevation={3} sx={{ borderRadius: 3 }}>
+                    <CardContent
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        p: 3,
+                      }}
+                    >
+                      <Avatar sx={{ bgcolor: color, width: 60, height: 60 }}>
+                        {icon}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h4" fontWeight="bold">
+                          {value}
+                        </Typography>
+                        <Typography color="text.secondary">{label}</Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <Card
-                elevation={6}
-                sx={{ bgcolor: "#e8f5e9", height: "100%", borderRadius: 3 }}
-              >
-                <CardContent sx={{ textAlign: "center", py: 6 }}>
-                  <Typography
-                    variant="h2"
-                    color="success.main"
-                    fontWeight="bold"
-                  >
-                    {doctors.length}
-                  </Typography>
-                  <Typography
-                    variant="h5"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
-                    Total Doctors
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <Card
-                elevation={6}
-                sx={{ bgcolor: "#fff3e0", height: "100%", borderRadius: 3 }}
-              >
-                <CardContent sx={{ textAlign: "center", py: 6 }}>
-                  <Typography
-                    variant="h2"
-                    color="warning.main"
-                    fontWeight="bold"
-                  >
-                    {appointments.length}
-                  </Typography>
-                  <Typography
-                    variant="h5"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
-                    Total Appointments
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+          </>
         )}
 
-        {/* Hospitals */}
-        {activeTab === "hospitals" && (
-          <Paper elevation={4} sx={{ p: 5, borderRadius: 3 }}>
+        {}
+        {tab === "hospitals" && (
+          <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
             <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mb: 5,
-              }}
+              sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}
             >
-              <Typography variant="h5" fontWeight="bold">
-                Manage Hospitals
+              <Typography variant="h6" fontWeight="bold">
+                Hospitals
               </Typography>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                size="large"
-                onClick={() => openModalHandler("addHospital")}
+                onClick={() => openModal("addHospital")}
               >
                 Add Hospital
               </Button>
             </Box>
             <TableContainer>
               <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>
-                      <strong>Name</strong>
-                    </TableCell>
-                    <TableCell>
-                      <strong>Location</strong>
-                    </TableCell>
-                    <TableCell align="right">
-                      <strong>Actions</strong>
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
+                <THead
+                  cols={[
+                    "Name",
+                    "Location",
+                    "Specialties",
+                    "Contact",
+                    "Actions",
+                  ]}
+                />
                 <TableBody>
                   {hospitals.map((h) => (
                     <TableRow key={h.id} hover>
-                      <TableCell sx={{ py: 3 }}>{h.name}</TableCell>
-                      <TableCell sx={{ py: 3 }}>{h.location}</TableCell>
-                      <TableCell align="right" sx={{ py: 3 }}>
+                      <TableCell>{h.name}</TableCell>
+                      <TableCell>{h.location}</TableCell>
+                      <TableCell>
+                        {(h.specialties || []).join(", ") || "—"}
+                      </TableCell>
+                      <TableCell>{h.contact || "N/A"}</TableCell>
+                      <TableCell align="right">
                         <IconButton
                           color="primary"
-                          onClick={() => openModalHandler("editHospital", h)}
+                          onClick={() => openModal("editHospital", h)}
                         >
                           <EditIcon />
                         </IconButton>
@@ -355,64 +367,72 @@ const AdminDashboard = () => {
         )}
 
         {/* Doctors */}
-        {activeTab === "doctors" && (
-          <Paper elevation={4} sx={{ p: 5, borderRadius: 3 }}>
+        {tab === "doctors" && (
+          <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
             <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mb: 5,
-              }}
+              sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}
             >
-              <Typography variant="h5" fontWeight="bold">
-                Manage Doctors
+              <Typography variant="h6" fontWeight="bold">
+                Doctors ({allDoctors.length})
               </Typography>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                size="large"
-                onClick={() => openModalHandler("addDoctor")}
+                onClick={() => openModal("addDoctor")}
               >
                 Add Doctor
               </Button>
             </Box>
             <TableContainer>
               <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>
-                      <strong>Name</strong>
-                    </TableCell>
-                    <TableCell>
-                      <strong>Specialty</strong>
-                    </TableCell>
-                    <TableCell align="right">
-                      <strong>Actions</strong>
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
+                <THead
+                  cols={[
+                    "Name",
+                    "Specialty",
+                    "Hospital",
+                    "Experience",
+                    "Actions",
+                  ]}
+                />
                 <TableBody>
-                  {doctors.map((d) => (
-                    <TableRow key={d.id} hover>
-                      <TableCell sx={{ py: 3 }}>{d.name}</TableCell>
-                      <TableCell sx={{ py: 3 }}>{d.specialty}</TableCell>
-                      <TableCell align="right" sx={{ py: 3 }}>
-                        <IconButton
-                          color="primary"
-                          onClick={() => openModalHandler("editDoctor", d)}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          color="error"
-                          onClick={() => handleDelete("doctor", d.id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {allDoctors.map((d) => {
+                    const isAdminAdded = adminDoctors.some(
+                      (ad) => ad.id === d.id,
+                    );
+                    return (
+                      <TableRow key={d.id} hover>
+                        <TableCell>{d.name}</TableCell>
+                        <TableCell>{d.specialty}</TableCell>
+                        <TableCell>{d.hospitalName || "—"}</TableCell>
+                        <TableCell>{d.experience || "—"}</TableCell>
+                        <TableCell align="right">
+                          {isAdminAdded ? (
+                            <>
+                              <IconButton
+                                color="primary"
+                                onClick={() => openModal("editDoctor", d)}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                              <IconButton
+                                color="error"
+                                onClick={() => handleDelete("doctor", d.id)}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </>
+                          ) : (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Built-in
+                            </Typography>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -420,73 +440,82 @@ const AdminDashboard = () => {
         )}
 
         {/* Appointments */}
-        {activeTab === "appointments" && (
-          <Paper elevation={4} sx={{ p: 5, borderRadius: 3 }}>
-            <Typography
-              variant="h5"
-              fontWeight="bold"
-              gutterBottom
-              sx={{ mb: 4 }}
-            >
-              Recent Appointments
+        {tab === "appointments" && (
+          <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
+            <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>
+              Appointments
             </Typography>
             <TableContainer>
               <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>
-                      <strong>Patient Name</strong>
-                    </TableCell>
-                    <TableCell>
-                      <strong>Doctor</strong>
-                    </TableCell>
-                    <TableCell>
-                      <strong>Hospital</strong>
-                    </TableCell>
-                    <TableCell>
-                      <strong>Preferred Time</strong>
-                    </TableCell>
-                    <TableCell>
-                      <strong>Date</strong>
-                    </TableCell>
-                    <TableCell>
-                      <strong>Status</strong>
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
+                <THead
+                  cols={[
+                    "Patient",
+                    "Doctor",
+                    "Hospital",
+                    "Time",
+                    "Date",
+                    "Status",
+                    "Actions",
+                  ]}
+                />
                 <TableBody>
-                  {appointments.length > 0 ? (
-                    appointments.map((appt, i) => (
-                      <TableRow key={i} hover>
-                        <TableCell sx={{ py: 3 }}>
-                          {appt.patientName || "—"}
+                  {appointments.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        align="center"
+                        sx={{ py: 8, color: "text.secondary" }}
+                      >
+                        No appointments yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    appointments.map((a) => (
+                      <TableRow key={a.id} hover>
+                        <TableCell>{a.patientName || "—"}</TableCell>
+                        <TableCell>{a.doctorName || "—"}</TableCell>
+                        <TableCell>{a.hospitalName || "—"}</TableCell>
+                        <TableCell>
+                          <strong>{a.preferredTime || "—"}</strong>
                         </TableCell>
-                        <TableCell sx={{ py: 3 }}>
-                          {appt.doctorName || "—"}
+                        <TableCell>{a.date || "—"}</TableCell>
+                        <TableCell>
+                          <StatusChip status={a.status} />
                         </TableCell>
-                        <TableCell sx={{ py: 3 }}>
-                          {appt.hospitalName || "—"}
-                        </TableCell>
-                        <TableCell sx={{ py: 3 }}>
-                          <strong>{appt.preferredTime || "—"}</strong>
-                        </TableCell>
-                        <TableCell sx={{ py: 3 }}>{appt.date || "—"}</TableCell>
-                        <TableCell sx={{ py: 3 }}>
-                          {getStatusChip(appt.status)}
+                        <TableCell align="right">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color={
+                              a.status === "Scheduled" ? "success" : "warning"
+                            }
+                            onClick={() =>
+                              setAppointments(
+                                appointments.map((x) =>
+                                  x.id === a.id
+                                    ? {
+                                        ...x,
+                                        status:
+                                          x.status === "Scheduled"
+                                            ? "Completed"
+                                            : "Scheduled",
+                                      }
+                                    : x,
+                                ),
+                              )
+                            }
+                          >
+                            {a.status === "Scheduled" ? "Complete" : "Reopen"}
+                          </Button>
+                          <IconButton
+                            color="error"
+                            onClick={() => handleDelete("appointment", a.id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
                         </TableCell>
                       </TableRow>
                     ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={6} align="center">
-                        <Typography
-                          color="text.secondary"
-                          sx={{ py: 10, fontSize: "1.2rem" }}
-                        >
-                          No appointments booked yet
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -495,50 +524,81 @@ const AdminDashboard = () => {
         )}
       </Box>
 
-      {/* Add/Edit Modal */}
+      {}
       <Dialog
-        open={openModal}
-        onClose={() => setOpenModal(false)}
+        open={modal.open}
+        onClose={() => setModal({ ...modal, open: false })}
         maxWidth="sm"
         fullWidth
       >
         <DialogTitle sx={{ fontWeight: "bold" }}>
-          {modalType.includes("add") ? "Add" : "Edit"}{" "}
-          {modalType.includes("Hospital") ? "Hospital" : "Doctor"}
+          {modal.type.includes("add") ? "Add" : "Edit"}{" "}
+          {modal.type.includes("Hospital") ? "Hospital" : "Doctor"}
         </DialogTitle>
         <DialogContent>
-          <TextField
-            fullWidth
-            label="Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            sx={{ mt: 3 }}
-          />
-          {modalType.includes("Hospital") && (
-            <TextField
-              fullWidth
-              label="Location"
-              value={formData.location}
-              onChange={(e) =>
-                setFormData({ ...formData, location: e.target.value })
-              }
-              sx={{ mt: 3 }}
-            />
+          <TextField {...field("name")} label="Name" />
+
+          {modal.type.includes("Hospital") && (
+            <>
+              <TextField {...field("location")} label="Location" />
+              <TextField
+                {...field("specialties")}
+                label="Specialties (comma separated)"
+                placeholder="Cardiology, Neurology"
+              />
+              <TextField {...field("contact")} label="Contact Number" />
+            </>
           )}
-          {modalType.includes("Doctor") && (
-            <TextField
-              fullWidth
-              label="Specialty"
-              value={formData.specialty}
-              onChange={(e) =>
-                setFormData({ ...formData, specialty: e.target.value })
-              }
-              sx={{ mt: 3 }}
-            />
+
+          {modal.type.includes("Doctor") && (
+            <>
+              <TextField {...field("specialty")} label="Specialty" />
+              <TextField
+                {...field("experience")}
+                label="Experience (e.g. 5 years)"
+              />
+              <TextField
+                {...field("qualification")}
+                label="Qualification (e.g. MBBS, MD)"
+              />
+              <TextField
+                {...field("availability")}
+                label="Availability (e.g. Mon–Fri 9AM–5PM)"
+              />
+              <TextField
+                {...field("bio")}
+                label="Bio / About"
+                multiline
+                rows={3}
+              />
+              <TextField
+                {...field("image")}
+                label="Photo URL (optional)"
+                placeholder="https://..."
+              />
+              <FormControl fullWidth sx={{ mt: 2 }}>
+                <InputLabel>Hospital</InputLabel>
+                <Select
+                  value={form.hospitalId || ""}
+                  label="Hospital"
+                  onChange={(e) =>
+                    setForm({ ...form, hospitalId: e.target.value })
+                  }
+                >
+                  {hospitals.map((h) => (
+                    <MenuItem key={h.id} value={h.id}>
+                      {h.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setOpenModal(false)}>Cancel</Button>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setModal({ ...modal, open: false })}>
+            Cancel
+          </Button>
           <Button variant="contained" onClick={handleSave}>
             Save
           </Button>
@@ -546,6 +606,4 @@ const AdminDashboard = () => {
       </Dialog>
     </Box>
   );
-};
-
-export default AdminDashboard;
+}

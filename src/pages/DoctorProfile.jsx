@@ -23,113 +23,46 @@ import {
   MenuItem,
   Alert,
 } from "@mui/material";
+import { doctors as STATIC_DOCTORS } from "../data/doctors";
+import PaymentDialog from "../components/PaymentDialog";
+import BookingConfirmation from "../components/BookingConfirmation";
+import { useNotify } from "../context/NotificationContext";
 
-import { doctors } from "../data/doctors";
+const TIME_SLOTS = [
+  "09:00 AM",
+  "10:00 AM",
+  "11:00 AM",
+  "02:00 PM",
+  "03:00 PM",
+  "04:00 PM",
+  "05:00 PM",
+];
+const EMPTY_FORM = {
+  fullName: "",
+  age: "",
+  contactNumber: "",
+  email: "",
+  preferredTime: "",
+};
+const CONSULT_FEE = 500;
 
-const DoctorProfile = () => {
+export default function DoctorProfile() {
   const { doctorId } = useParams();
-  const doctor = doctors.find((d) => d.id === Number(doctorId));
+  const notify = useNotify();
+
+  const allDoctors = [
+    ...STATIC_DOCTORS,
+    ...JSON.parse(localStorage.getItem("doctors") || "[]"),
+  ];
+  const doctor = allDoctors.find((d) => d.id === Number(doctorId));
 
   const [openBooking, setOpenBooking] = useState(false);
-  const [formData, setFormData] = useState({
-    fullName: "",
-    age: "",
-    contactNumber: "",
-    email: "",
-    preferredTime: "",
-  });
+  const [openPayment, setOpenPayment] = useState(false);
+  const [openConfirmation, setOpenConfirmation] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
-  const [bookingMessage, setBookingMessage] = useState("");
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
-  };
-
-  const handleConfirmBooking = () => {
-    const newErrors = {};
-    let hasError = false;
-
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = "Full name is required";
-      hasError = true;
-    }
-    if (!formData.age.trim()) {
-      newErrors.age = "Age is required";
-      hasError = true;
-    }
-    if (!formData.contactNumber.trim()) {
-      newErrors.contactNumber = "Contact number is required";
-      hasError = true;
-    }
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-      hasError = true;
-    }
-    if (!formData.preferredTime) {
-      newErrors.preferredTime = "Preferred time is required";
-      hasError = true;
-    }
-
-    setErrors(newErrors);
-    if (hasError) {
-      setBookingMessage("Please fill all required fields!");
-      return;
-    }
-
-    // Check for time conflict
-    const existing = JSON.parse(localStorage.getItem("appointments")) || [];
-    const conflict = existing.some(
-      (appt) =>
-        appt.doctorId === doctor.id &&
-        appt.preferredTime === formData.preferredTime,
-    );
-
-    if (conflict) {
-      setBookingMessage(
-        "This time slot is already booked for this doctor!\nPlease choose another time.",
-      );
-      return;
-    }
-
-    // Save the booking
-    const newAppointment = {
-      id: Date.now(),
-      doctorId: doctor.id,
-      doctorName: doctor.name,
-      hospitalName: doctor.hospitalName || "City Care Hospital", // ← This line adds hospital name!
-      patientName: formData.fullName,
-      age: formData.age,
-      contactNumber: formData.contactNumber,
-      email: formData.email,
-      preferredTime: formData.preferredTime,
-      status: "Scheduled",
-      date: new Date().toLocaleDateString(),
-    };
-
-    localStorage.setItem(
-      "appointments",
-      JSON.stringify([...existing, newAppointment]),
-    );
-
-    setBookingMessage(
-      `Booking Confirmed!\n\nDoctor: ${doctor.name}\nPatient: ${formData.fullName}\nTime: ${formData.preferredTime}`,
-    );
-
-    setTimeout(() => {
-      setOpenBooking(false);
-      setFormData({
-        fullName: "",
-        age: "",
-        contactNumber: "",
-        email: "",
-        preferredTime: "",
-      });
-      setErrors({});
-      setBookingMessage("");
-    }, 2000);
-  };
+  const [formError, setFormError] = useState("");
+  const [savedBooking, setSavedBooking] = useState(null);
 
   if (!doctor) {
     return (
@@ -141,105 +74,208 @@ const DoctorProfile = () => {
     );
   }
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: "" }));
+    setFormError("");
+  };
+
+  // Special handler for contact number — digits only, max 10
+  const handleContactChange = (e) => {
+    const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+    setForm((prev) => ({ ...prev, contactNumber: val }));
+    setErrors((prev) => ({ ...prev, contactNumber: "" }));
+    setFormError("");
+  };
+
+  const handleProceedToPayment = () => {
+    const newErrors = {};
+
+    // Full Name
+    if (!form.fullName.trim()) {
+      newErrors.fullName = "This field is required";
+    }
+
+    // Age
+    if (!form.age) {
+      newErrors.age = "This field is required";
+    }
+
+    // Contact Number — exactly 10 digits
+    if (!form.contactNumber) {
+      newErrors.contactNumber = "This field is required";
+    } else if (!/^\d{10}$/.test(form.contactNumber)) {
+      newErrors.contactNumber = "Contact number must be exactly 10 digits";
+    }
+
+    // Email — valid format
+    if (!form.email) {
+      newErrors.email = "This field is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+
+    // Preferred Time
+    if (!form.preferredTime) {
+      newErrors.preferredTime = "This field is required";
+    }
+
+    if (Object.keys(newErrors).length) {
+      setErrors(newErrors);
+      setFormError("Please fix the errors below.");
+      return;
+    }
+
+    const existing = JSON.parse(localStorage.getItem("appointments") || "[]");
+    if (
+      existing.some(
+        (a) =>
+          a.doctorId === doctor.id && a.preferredTime === form.preferredTime,
+      )
+    ) {
+      setFormError("This time slot is already booked. Please choose another.");
+      return;
+    }
+
+    setOpenBooking(false);
+    setOpenPayment(true);
+  };
+
+  const handlePaymentSuccess = (paymentMethod) => {
+    setOpenPayment(false);
+
+    const existing = JSON.parse(localStorage.getItem("appointments") || "[]");
+    const newAppt = {
+      id: Date.now(),
+      doctorId: doctor.id,
+      doctorName: doctor.name,
+      hospitalName: doctor.hospitalName || "N/A",
+      patientName: form.fullName,
+      age: form.age,
+      contactNumber: form.contactNumber,
+      email: form.email,
+      preferredTime: form.preferredTime,
+      status: "Scheduled",
+      date: new Date().toLocaleDateString(),
+      amount: CONSULT_FEE,
+      paymentMethod,
+    };
+
+    localStorage.setItem(
+      "appointments",
+      JSON.stringify([...existing, newAppt]),
+    );
+    setSavedBooking(newAppt);
+
+    notify(
+      `Appointment booked with ${doctor.name} at ${form.preferredTime}!`,
+      "success",
+    );
+
+    setOpenConfirmation(true);
+    setForm(EMPTY_FORM);
+    setErrors({});
+    setFormError("");
+  };
+
+  const details = [
+    { label: "Experience", value: doctor.experience || "N/A" },
+    { label: "Qualification", value: doctor.qualification || "N/A" },
+    { label: "Availability", value: doctor.availability || "N/A" },
+    {
+      label: "About",
+      value: doctor.bio || "Experienced and dedicated physician.",
+    },
+  ];
+
   return (
-    <Container maxWidth="xl" sx={{ py: 10, minHeight: "100vh" }}>
-      <Paper
-        elevation={6}
-        sx={{ p: { xs: 4, md: 8 }, borderRadius: 4, bgcolor: "#ffffff" }}
-      >
+    <Container maxWidth="xl" sx={{ py: 10 }}>
+      <Paper elevation={6} sx={{ p: { xs: 4, md: 8 }, borderRadius: 4 }}>
         <Grid container spacing={6}>
-          {/* Left - Photo + Basic Info */}
-          <Grid item xs={12} md={5}>
-            <Box sx={{ textAlign: "center" }}>
-              <Avatar
-                src={doctor.image}
-                alt={doctor.name}
-                sx={{
-                  width: { xs: 280, md: 400 },
-                  height: { xs: 280, md: 400 },
-                  mx: "auto",
-                  mb: 4,
-                  border: "6px solid #e3f2fd",
-                  boxShadow: 6,
-                }}
-              />
-              <Typography variant="h3" fontWeight="bold" gutterBottom>
-                {doctor.name}
+          {/* Left — photo */}
+          <Grid item xs={12} md={5} sx={{ textAlign: "center" }}>
+            <Avatar
+              src={doctor.image}
+              alt={doctor.name}
+              sx={{
+                width: { xs: 240, md: 380 },
+                height: { xs: 240, md: 380 },
+                mx: "auto",
+                mb: 3,
+                border: "6px solid #e3f2fd",
+                boxShadow: 6,
+                fontSize: "8rem",
+                bgcolor: "#e3f2fd",
+              }}
+            >
+              {!doctor.image && "👨‍⚕️"}
+            </Avatar>
+            <Typography variant="h4" fontWeight="bold">
+              {doctor.name}
+            </Typography>
+            <Typography variant="h6" color="primary">
+              {doctor.specialty}
+            </Typography>
+            {doctor.hospitalName && (
+              <Typography color="text.secondary">
+                {doctor.hospitalName}
               </Typography>
-              <Typography variant="h5" color="primary" gutterBottom>
-                {doctor.specialty}
-              </Typography>
-            </Box>
+            )}
           </Grid>
 
-          {/* Right - Details + Booking */}
+          {/* Right — details */}
           <Grid item xs={12} md={7}>
             <Typography
-              variant="h4"
-              gutterBottom
-              sx={{ mb: 4, fontWeight: 600, color: "#1976d2" }}
+              variant="h5"
+              fontWeight={600}
+              color="primary"
+              sx={{ mb: 2 }}
             >
               Professional Details
             </Typography>
-
-            <Divider sx={{ mb: 4 }} />
-
+            <Divider sx={{ mb: 3 }} />
             <List disablePadding>
-              <ListItem sx={{ py: 2.5 }}>
-                <ListItemText
-                  primary={<Typography variant="h6">Experience</Typography>}
-                  secondary={
-                    <Typography variant="body1" sx={{ fontSize: "1.15rem" }}>
-                      {doctor.experience}
-                    </Typography>
-                  }
-                />
-              </ListItem>
-
-              <ListItem sx={{ py: 2.5 }}>
-                <ListItemText
-                  primary={<Typography variant="h6">Qualification</Typography>}
-                  secondary={
-                    <Typography variant="body1" sx={{ fontSize: "1.15rem" }}>
-                      {doctor.qualification}
-                    </Typography>
-                  }
-                />
-              </ListItem>
-
-              <ListItem sx={{ py: 2.5 }}>
-                <ListItemText
-                  primary={<Typography variant="h6">Availability</Typography>}
-                  secondary={
-                    <Typography variant="body1" sx={{ fontSize: "1.15rem" }}>
-                      {doctor.availability}
-                    </Typography>
-                  }
-                />
-              </ListItem>
-
-              <ListItem sx={{ py: 2.5, alignItems: "flex-start" }}>
-                <ListItemText
-                  primary={<Typography variant="h6">About</Typography>}
-                  secondary={
-                    <Typography
-                      variant="body1"
-                      sx={{ fontSize: "1.15rem", lineHeight: 1.8 }}
-                    >
-                      {doctor.bio ||
-                        "Experienced and dedicated physician committed to patient care."}
-                    </Typography>
-                  }
-                />
-              </ListItem>
+              {details.map(({ label, value }) => (
+                <ListItem key={label} sx={{ py: 2 }}>
+                  <ListItemText
+                    primary={<Typography variant="h6">{label}</Typography>}
+                    secondary={
+                      <Typography
+                        variant="body1"
+                        sx={{ fontSize: "1.1rem", lineHeight: 1.8 }}
+                      >
+                        {value}
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              ))}
             </List>
 
-            <Box sx={{ mt: 8, textAlign: "center" }}>
+            {/* Fee info */}
+            <Box
+              sx={{
+                mt: 3,
+                p: 2,
+                bgcolor: "#e8f5e9",
+                borderRadius: 2,
+                textAlign: "center",
+              }}
+            >
+              <Typography variant="body1" color="text.secondary">
+                Consultation Fee
+              </Typography>
+              <Typography variant="h5" fontWeight="bold" color="success.main">
+                NPR {CONSULT_FEE}
+              </Typography>
+            </Box>
+
+            <Box sx={{ mt: 4, textAlign: "center" }}>
               <Button
                 variant="contained"
-                color="primary"
                 size="large"
-                sx={{ py: 2.5, px: 8, fontSize: "1.3rem", borderRadius: 3 }}
+                sx={{ py: 2, px: 8, fontSize: "1.2rem", borderRadius: 3 }}
                 onClick={() => setOpenBooking(true)}
               >
                 Book Appointment
@@ -256,36 +292,31 @@ const DoctorProfile = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ fontWeight: "bold", color: "#1976d2" }}>
-          Book Appointment with {doctor.name}
+        <DialogTitle sx={{ fontWeight: "bold", color: "primary.main" }}>
+          Book Appointment — {doctor.name}
         </DialogTitle>
-
         <DialogContent dividers>
-          {bookingMessage && (
-            <Alert
-              severity={
-                bookingMessage.includes("Confirmed") ? "success" : "error"
-              }
-              sx={{ mb: 3 }}
-            >
-              {bookingMessage}
+          {formError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {formError}
             </Alert>
           )}
-
-          <Grid container spacing={3}>
+          <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            {/* Full Name */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 required
                 label="Full Name"
                 name="fullName"
-                value={formData.fullName}
-                onChange={handleInputChange}
+                value={form.fullName}
+                onChange={handleChange}
                 error={!!errors.fullName}
                 helperText={errors.fullName}
               />
             </Grid>
 
+            {/* Age */}
             <Grid item xs={6}>
               <TextField
                 fullWidth
@@ -293,26 +324,29 @@ const DoctorProfile = () => {
                 label="Age"
                 name="age"
                 type="number"
-                value={formData.age}
-                onChange={handleInputChange}
+                value={form.age}
+                onChange={handleChange}
                 error={!!errors.age}
                 helperText={errors.age}
               />
             </Grid>
 
+            {/* Contact Number — digits only, max 10 */}
             <Grid item xs={6}>
               <TextField
                 fullWidth
                 required
                 label="Contact Number"
                 name="contactNumber"
-                value={formData.contactNumber}
-                onChange={handleInputChange}
+                value={form.contactNumber}
+                onChange={handleContactChange}
+                inputProps={{ maxLength: 10, inputMode: "numeric" }}
                 error={!!errors.contactNumber}
-                helperText={errors.contactNumber}
+                helperText={errors.contactNumber || "Must be exactly 10 digits"}
               />
             </Grid>
 
+            {/* Email */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -320,53 +354,79 @@ const DoctorProfile = () => {
                 label="Email"
                 name="email"
                 type="email"
-                value={formData.email}
-                onChange={handleInputChange}
+                value={form.email}
+                onChange={handleChange}
                 error={!!errors.email}
                 helperText={errors.email}
               />
             </Grid>
 
+            {/* Preferred Time */}
             <Grid item xs={12}>
               <FormControl fullWidth required error={!!errors.preferredTime}>
                 <InputLabel>Preferred Time</InputLabel>
                 <Select
                   name="preferredTime"
-                  value={formData.preferredTime}
+                  value={form.preferredTime}
                   label="Preferred Time"
-                  onChange={handleInputChange}
+                  onChange={handleChange}
                 >
-                  <MenuItem value="09:00 AM">09:00 AM</MenuItem>
-                  <MenuItem value="10:00 AM">10:00 AM</MenuItem>
-                  <MenuItem value="11:00 AM">11:00 AM</MenuItem>
-                  <MenuItem value="02:00 PM">02:00 PM</MenuItem>
-                  <MenuItem value="03:00 PM">03:00 PM</MenuItem>
-                  <MenuItem value="04:00 PM">04:00 PM</MenuItem>
-                  <MenuItem value="05:00 PM">05:00 PM</MenuItem>
+                  {TIME_SLOTS.map((t) => (
+                    <MenuItem key={t} value={t}>
+                      {t}
+                    </MenuItem>
+                  ))}
                 </Select>
                 {errors.preferredTime && (
-                  <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                  <Typography
+                    variant="caption"
+                    color="error"
+                    sx={{ mt: 0.5, ml: 1.5 }}
+                  >
                     {errors.preferredTime}
                   </Typography>
                 )}
               </FormControl>
             </Grid>
           </Grid>
-        </DialogContent>
 
-        <DialogActions sx={{ p: 3 }}>
+          <Box sx={{ mt: 2, p: 1.5, bgcolor: "#f5f5f5", borderRadius: 1 }}>
+            <Typography variant="body2" color="text.secondary" align="center">
+              Consultation fee: <strong>NPR {CONSULT_FEE}</strong> — payable in
+              the next step
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenBooking(false)}>Cancel</Button>
           <Button
             variant="contained"
             color="primary"
-            onClick={handleConfirmBooking}
+            onClick={handleProceedToPayment}
           >
-            Confirm Booking
+            Proceed to Payment →
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Payment Dialog */}
+      <PaymentDialog
+        open={openPayment}
+        onClose={() => {
+          setOpenPayment(false);
+          setOpenBooking(true);
+        }}
+        onSuccess={handlePaymentSuccess}
+        amount={CONSULT_FEE}
+        doctorName={doctor.name}
+      />
+
+      {/* Booking Confirmation */}
+      <BookingConfirmation
+        open={openConfirmation}
+        onClose={() => setOpenConfirmation(false)}
+        booking={savedBooking}
+      />
     </Container>
   );
-};
-
-export default DoctorProfile;
+}
