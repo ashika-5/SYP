@@ -84,7 +84,6 @@ export default function DoctorProfile() {
     setFormError("");
   };
 
-  // Contact number: digits only, max 10
   const handleContactChange = (e) => {
     const val = e.target.value.replace(/\D/g, "").slice(0, 10);
     setForm((prev) => ({ ...prev, contactNumber: val }));
@@ -129,7 +128,6 @@ export default function DoctorProfile() {
       return;
     }
 
-    // Save pending booking — eSewa will use this after redirect
     const booking = {
       doctorId: doctor.id,
       doctorName: doctor.name,
@@ -270,7 +268,6 @@ export default function DoctorProfile() {
             </Alert>
           )}
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            {/* Full Name */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -284,7 +281,6 @@ export default function DoctorProfile() {
               />
             </Grid>
 
-            {/* Age */}
             <Grid item xs={6}>
               <TextField
                 fullWidth
@@ -299,7 +295,6 @@ export default function DoctorProfile() {
               />
             </Grid>
 
-            {/* Contact Number */}
             <Grid item xs={6}>
               <TextField
                 fullWidth
@@ -314,7 +309,6 @@ export default function DoctorProfile() {
               />
             </Grid>
 
-            {/* Email */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -329,7 +323,6 @@ export default function DoctorProfile() {
               />
             </Grid>
 
-            {/* Preferred Time */}
             <Grid item xs={12}>
               <FormControl fullWidth required error={!!errors.preferredTime}>
                 <InputLabel>Preferred Time</InputLabel>
@@ -389,7 +382,7 @@ export default function DoctorProfile() {
         pendingBooking={pendingBooking}
       />
 
-      {/* Booking Confirmation (still used if needed) */}
+      {/* Booking Confirmation */}
       <BookingConfirmation
         open={openConfirmation}
         onClose={() => setOpenConfirmation(false)}

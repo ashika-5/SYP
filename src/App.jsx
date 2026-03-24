@@ -10,11 +10,10 @@ import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import PaymentFailure from "./pages/PaymentFailure.jsx";
 import Navbar from "./components/Navbar";
 
-import { NotificationProvider } from "./context/NotificationContext";
 
 function App() {
   return (
-    <NotificationProvider>
+    
       <Router>
         <div style={{ backgroundColor: "#f5f5f5", minHeight: "100vh" }}>
           <Navbar />
@@ -44,7 +43,7 @@ function App() {
           </Routes>
         </div>
       </Router>
-    </NotificationProvider>
+   
   );
 }
 

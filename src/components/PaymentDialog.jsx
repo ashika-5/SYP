@@ -38,14 +38,14 @@ export default function PaymentDialog({
     setError("");
     setLoading(true);
 
-    
+    // Save pending booking to localStorage before redirect
     if (pendingBooking) {
       localStorage.setItem("pendingBooking", JSON.stringify(pendingBooking));
     }
 
     const transactionId = `TXN-${Date.now()}`;
 
-   
+    // Small delay so user sees "Processing" before redirect
     setTimeout(() => {
       initiateEsewaPayment({ amount, transactionId });
     }, 800);
@@ -118,6 +118,8 @@ export default function PaymentDialog({
           }}
           helperText="Enter the 10-digit mobile number linked to your eSewa account"
         />
+
+
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 3, flexDirection: "column", gap: 1 }}>

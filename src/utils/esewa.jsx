@@ -23,7 +23,6 @@ export function initiateEsewaPayment({ amount, transactionId }) {
     signature: signature,
   };
 
-  // Create a hidden form and submit it to eSewa
   const form = document.createElement("form");
   form.method = "POST";
   form.action = ESEWA_PAYMENT_URL;
