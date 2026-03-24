@@ -37,6 +37,7 @@ const TIME_SLOTS = [
   "04:00 PM",
   "05:00 PM",
 ];
+
 const EMPTY_FORM = {
   fullName: "",
   age: "",
@@ -44,6 +45,7 @@ const EMPTY_FORM = {
   email: "",
   preferredTime: "",
 };
+
 const CONSULT_FEE = 500;
 
 export default function DoctorProfile() {
@@ -63,6 +65,7 @@ export default function DoctorProfile() {
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState("");
   const [savedBooking, setSavedBooking] = useState(null);
+  const [pendingBooking, setPendingBooking] = useState(null);
 
   if (!doctor) {
     return (
@@ -81,7 +84,7 @@ export default function DoctorProfile() {
     setFormError("");
   };
 
-  // Special handler for contact number — digits only, max 10
+  // Contact number: digits only, max 10
   const handleContactChange = (e) => {
     const val = e.target.value.replace(/\D/g, "").slice(0, 10);
     setForm((prev) => ({ ...prev, contactNumber: val }));
@@ -92,34 +95,22 @@ export default function DoctorProfile() {
   const handleProceedToPayment = () => {
     const newErrors = {};
 
-    // Full Name
-    if (!form.fullName.trim()) {
-      newErrors.fullName = "This field is required";
-    }
+    if (!form.fullName.trim()) newErrors.fullName = "This field is required";
+    if (!form.age) newErrors.age = "This field is required";
 
-    // Age
-    if (!form.age) {
-      newErrors.age = "This field is required";
-    }
-
-    // Contact Number — exactly 10 digits
     if (!form.contactNumber) {
       newErrors.contactNumber = "This field is required";
     } else if (!/^\d{10}$/.test(form.contactNumber)) {
       newErrors.contactNumber = "Contact number must be exactly 10 digits";
     }
 
-    // Email — valid format
     if (!form.email) {
       newErrors.email = "This field is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       newErrors.email = "Please enter a valid email address";
     }
 
-    // Preferred Time
-    if (!form.preferredTime) {
-      newErrors.preferredTime = "This field is required";
-    }
+    if (!form.preferredTime) newErrors.preferredTime = "This field is required";
 
     if (Object.keys(newErrors).length) {
       setErrors(newErrors);
@@ -138,16 +129,8 @@ export default function DoctorProfile() {
       return;
     }
 
-    setOpenBooking(false);
-    setOpenPayment(true);
-  };
-
-  const handlePaymentSuccess = (paymentMethod) => {
-    setOpenPayment(false);
-
-    const existing = JSON.parse(localStorage.getItem("appointments") || "[]");
-    const newAppt = {
-      id: Date.now(),
+    // Save pending booking — eSewa will use this after redirect
+    const booking = {
       doctorId: doctor.id,
       doctorName: doctor.name,
       hospitalName: doctor.hospitalName || "N/A",
@@ -156,27 +139,12 @@ export default function DoctorProfile() {
       contactNumber: form.contactNumber,
       email: form.email,
       preferredTime: form.preferredTime,
-      status: "Scheduled",
-      date: new Date().toLocaleDateString(),
       amount: CONSULT_FEE,
-      paymentMethod,
     };
+    setPendingBooking(booking);
 
-    localStorage.setItem(
-      "appointments",
-      JSON.stringify([...existing, newAppt]),
-    );
-    setSavedBooking(newAppt);
-
-    notify(
-      `Appointment booked with ${doctor.name} at ${form.preferredTime}!`,
-      "success",
-    );
-
-    setOpenConfirmation(true);
-    setForm(EMPTY_FORM);
-    setErrors({});
-    setFormError("");
+    setOpenBooking(false);
+    setOpenPayment(true);
   };
 
   const details = [
@@ -331,7 +299,7 @@ export default function DoctorProfile() {
               />
             </Grid>
 
-            {/* Contact Number — digits only, max 10 */}
+            {/* Contact Number */}
             <Grid item xs={6}>
               <TextField
                 fullWidth
@@ -392,8 +360,8 @@ export default function DoctorProfile() {
 
           <Box sx={{ mt: 2, p: 1.5, bgcolor: "#f5f5f5", borderRadius: 1 }}>
             <Typography variant="body2" color="text.secondary" align="center">
-              Consultation fee: <strong>NPR {CONSULT_FEE}</strong> — payable in
-              the next step
+              Consultation fee: <strong>NPR {CONSULT_FEE}</strong> — payable via
+              eSewa in the next step
             </Typography>
           </Box>
         </DialogContent>
@@ -409,19 +377,19 @@ export default function DoctorProfile() {
         </DialogActions>
       </Dialog>
 
-      {/* Payment Dialog */}
+      {/* eSewa Payment Dialog */}
       <PaymentDialog
         open={openPayment}
         onClose={() => {
           setOpenPayment(false);
           setOpenBooking(true);
         }}
-        onSuccess={handlePaymentSuccess}
         amount={CONSULT_FEE}
         doctorName={doctor.name}
+        pendingBooking={pendingBooking}
       />
 
-      {/* Booking Confirmation */}
+      {/* Booking Confirmation (still used if needed) */}
       <BookingConfirmation
         open={openConfirmation}
         onClose={() => setOpenConfirmation(false)}

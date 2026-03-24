@@ -6,6 +6,8 @@ import DoctorsList from "./pages/DoctorsList.jsx";
 import DoctorProfile from "./pages/DoctorProfile.jsx";
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 import Login from "./pages/Login.jsx";
+import PaymentSuccess from "./pages/PaymentSuccess.jsx";
+import PaymentFailure from "./pages/PaymentFailure.jsx";
 import Navbar from "./components/Navbar";
 
 import { NotificationProvider } from "./context/NotificationContext";
@@ -25,6 +27,11 @@ function App() {
             <Route path="/doctor/:doctorId" element={<DoctorProfile />} />
             <Route path="/admin/login" element={<Login />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
+            {/* eSewa payment result pages */}
+            <Route path="/payment/success" element={<PaymentSuccess />} />
+            <Route path="/payment/failure" element={<PaymentFailure />} />
+
             <Route
               path="*"
               element={
