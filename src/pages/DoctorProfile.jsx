@@ -32,6 +32,7 @@ import WorkIcon from "@mui/icons-material/Work";
 import InfoIcon from "@mui/icons-material/Info";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import LoginIcon from "@mui/icons-material/Login";
 
 import { doctors as STATIC_DOCTORS } from "../data/doctors";
 import PaymentDialog from "../components/PaymentDialog";
@@ -171,11 +172,11 @@ export default function DoctorProfile() {
     setFormError("");
   };
 
-  // Handle Book Appointment Button Click
+  // ==================== BOOKING LOGIC ====================
   const handleBookClick = () => {
     if (!currentUser) {
-      notify("Please login to book an appointment", "info");
-      navigate("/patient/login");
+      notify("Please login or register to book an appointment", "info");
+      navigate("/patient/login"); // Redirect to login/register page
       return;
     }
     setOpenBooking(true);
@@ -193,13 +194,12 @@ export default function DoctorProfile() {
       return;
     }
 
-    // Check for double booking
     const existing = JSON.parse(localStorage.getItem("appointments") || "[]");
-    const isAlreadyBooked = existing.some(
+    const isBooked = existing.some(
       (a) => a.doctorId === doctor.id && a.preferredTime === form.preferredTime,
     );
 
-    if (isAlreadyBooked) {
+    if (isBooked) {
       setFormError("This time slot is already booked. Please choose another.");
       return;
     }
@@ -234,12 +234,9 @@ export default function DoctorProfile() {
     );
 
     setSavedBooking(newAppt);
-    notify(
-      `Appointment booked successfully with ${doctor.name} at ${form.preferredTime}`,
-      "success",
-    );
-
+    notify(`Appointment booked successfully with ${doctor.name}!`, "success");
     setOpenConfirmation(true);
+
     setForm(EMPTY_FORM);
     setErrors({});
     setFormError("");
@@ -278,7 +275,7 @@ export default function DoctorProfile() {
           boxShadow: "0 4px 32px rgba(25,118,210,0.08)",
         }}
       >
-        {/* Blue Top Banner */}
+        {/* Blue Banner */}
         <Box
           sx={{
             background: `linear-gradient(135deg, ${PRIMARY_DARK} 0%, ${PRIMARY} 60%, #42a5f5 100%)`,
@@ -288,7 +285,7 @@ export default function DoctorProfile() {
 
         <Box sx={{ px: { xs: 3, md: 6 }, pb: 6 }}>
           <Grid container spacing={5}>
-            {/* Left Column - Avatar & Booking */}
+            {/* Left - Avatar + Booking */}
             <Grid item xs={12} md={4}>
               <Box sx={{ textAlign: "center", mt: -9 }}>
                 <Avatar
@@ -339,7 +336,7 @@ export default function DoctorProfile() {
                   </Box>
                 )}
 
-                {/* Booking Section */}
+                {/* Fee & Book Button */}
                 <Paper
                   sx={{
                     mt: 4,
@@ -349,7 +346,11 @@ export default function DoctorProfile() {
                     bgcolor: PRIMARY_LIGHT,
                   }}
                 >
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                  >
                     Consultation Fee
                   </Typography>
                   <Typography
@@ -365,7 +366,7 @@ export default function DoctorProfile() {
                     fullWidth
                     variant="contained"
                     size="large"
-                    endIcon={<ArrowForwardIcon />}
+                    endIcon={currentUser ? <ArrowForwardIcon /> : <LoginIcon />}
                     onClick={handleBookClick}
                     sx={{
                       mt: 3,
@@ -380,23 +381,13 @@ export default function DoctorProfile() {
                   >
                     {currentUser
                       ? "Book Appointment"
-                      : "Login to Book Appointment"}
+                      : "Login / Register to Book"}
                   </Button>
-
-                  {!currentUser && (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ mt: 1.5, display: "block" }}
-                    >
-                      You must be logged in to book an appointment
-                    </Typography>
-                  )}
                 </Paper>
               </Box>
             </Grid>
 
-            {/* Right Column - Professional Details */}
+            {/* Right - Details */}
             <Grid item xs={12} md={8}>
               <Box sx={{ pt: { xs: 2, md: 6 } }}>
                 <Typography
@@ -425,7 +416,7 @@ export default function DoctorProfile() {
         </Box>
       </Paper>
 
-      {/* Booking Form Dialog */}
+      {/* Booking Form Dialog - Only shown when logged in */}
       <Dialog
         open={openBooking}
         onClose={() => setOpenBooking(false)}
@@ -500,7 +491,7 @@ export default function DoctorProfile() {
             </Grid>
             <Grid item xs={12}>
               <FormField
-                label="Preferred Time"
+                label="Preferred Time Slot"
                 name="preferredTime"
                 value={form.preferredTime}
                 onChange={handleChange}
@@ -525,7 +516,6 @@ export default function DoctorProfile() {
               borderRadius: 2,
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center",
             }}
           >
             <Typography variant="body2" color="text.secondary">
@@ -549,7 +539,7 @@ export default function DoctorProfile() {
         </DialogActions>
       </Dialog>
 
-      {/* Payment Dialog */}
+      {/* Payment & Confirmation Dialogs */}
       <PaymentDialog
         open={openPayment}
         onClose={() => {
@@ -561,7 +551,6 @@ export default function DoctorProfile() {
         doctorName={doctor.name}
       />
 
-      {/* Booking Confirmation Dialog */}
       <BookingConfirmation
         open={openConfirmation}
         onClose={() => setOpenConfirmation(false)}

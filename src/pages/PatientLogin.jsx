@@ -27,7 +27,7 @@ export default function PatientLogin() {
   const [success, setSuccess] = useState("");
 
   const navigate = useNavigate();
-  const { registerPatient, loginPatient } = useAuth();
+  const { registerPatient, loginPatient } = useAuth(); // ← Correct function names
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -35,34 +35,39 @@ export default function PatientLogin() {
     setSuccess("");
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
     try {
       if (mode === "register") {
+        if (!form.fullName || !form.email || !form.password) {
+          setError("All fields are required");
+          return;
+        }
         if (form.password !== form.confirmPassword) {
           setError("Passwords do not match");
           return;
         }
         if (form.password.length < 6) {
-          setError("Password must be at least 6 characters");
+          setError("Password must be at least 6 characters long");
           return;
         }
 
-        const newUser = registerPatient(
-          form.fullName,
-          form.email,
-          form.password,
-        );
-        setSuccess("Account created successfully! You can now login.");
-        setMode("login"); // Switch to login after successful register
+        registerPatient(form.fullName, form.email, form.password);
+        setSuccess("Account created successfully! Please login.");
+        setMode("login"); // Switch to login mode
         setForm({ ...form, password: "", confirmPassword: "" });
       } else {
-        // Login mode
+        // Login Mode
+        if (!form.email || !form.password) {
+          setError("Email and password are required");
+          return;
+        }
+
         loginPatient(form.email, form.password);
-        navigate("/patient");
+        navigate("/patient"); // Go to patient dashboard
       }
     } catch (err) {
       setError(err.message);
@@ -75,7 +80,7 @@ export default function PatientLogin() {
         <Box sx={{ textAlign: "center", mb: 4 }}>
           <PersonIcon sx={{ fontSize: 60, color: "#1976d2" }} />
           <Typography variant="h4" fontWeight={700} sx={{ mt: 2 }}>
-            {mode === "login" ? "Patient Login" : "Create Account"}
+            {mode === "login" ? "Patient Login" : "Create New Account"}
           </Typography>
         </Box>
 
@@ -156,7 +161,7 @@ export default function PatientLogin() {
             size="large"
             sx={{ mt: 4, py: 1.5, borderRadius: 3, fontWeight: 600 }}
           >
-            {mode === "login" ? "Login" : "Register"}
+            {mode === "login" ? "Login" : "Create Account"}
           </Button>
         </form>
       </Paper>
