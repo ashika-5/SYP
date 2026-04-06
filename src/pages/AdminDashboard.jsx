@@ -1,3 +1,4 @@
+// src/pages/AdminDashboard.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -39,8 +40,10 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+
 import { hospitals as DEFAULT_HOSPITALS } from "../data/hospitals";
 import { doctors as STATIC_DOCTORS } from "../data/doctors";
+import { useAuth } from "../context/AuthContext";
 
 const load = (key, fallback = []) => {
   try {
@@ -52,9 +55,8 @@ const load = (key, fallback = []) => {
 
 const StatusChip = ({ status }) => {
   const color =
-    { Scheduled: "warning", Completed: "success", Cancelled: "error" }[
-      status
-    ] || "default";
+    { Scheduled: "success", Completed: "info", Cancelled: "error" }[status] ||
+    "default";
   return <Chip label={status || "Scheduled"} color={color} size="small" />;
 };
 
@@ -93,18 +95,18 @@ const SIDEBAR_ITEMS = [
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { isAdmin, logout } = useAuth();
 
-  // Redirect if not logged in
+  // Redirect if not logged in as admin
   useEffect(() => {
-    if (localStorage.getItem("isAdminLoggedIn") !== "true")
+    if (!isAdmin) {
       navigate("/admin/login");
-  }, [navigate]);
+    }
+  }, [isAdmin, navigate]);
 
   const [tab, setTab] = useState("dashboard");
   const [adminDoctors, setAdminDoctors] = useState(() => load("doctors"));
   const [appointments, setAppointments] = useState(() => load("appointments"));
-  const [modal, setModal] = useState({ open: false, type: "", item: null });
-  const [form, setForm] = useState(EMPTY_FORM);
 
   const [hospitals, setHospitals] = useState(() => {
     const defaultIds = new Set(DEFAULT_HOSPITALS.map((h) => h.id));
@@ -114,6 +116,7 @@ export default function AdminDashboard() {
 
   const allDoctors = [...STATIC_DOCTORS, ...adminDoctors];
 
+  // Save to localStorage whenever data changes
   useEffect(() => {
     const defaultIds = new Set(DEFAULT_HOSPITALS.map((h) => h.id));
     localStorage.setItem(
@@ -123,6 +126,9 @@ export default function AdminDashboard() {
     localStorage.setItem("doctors", JSON.stringify(adminDoctors));
     localStorage.setItem("appointments", JSON.stringify(appointments));
   }, [hospitals, adminDoctors, appointments]);
+
+  const [modal, setModal] = useState({ open: false, type: "", item: null });
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const openModal = (type, item = null) => {
     setForm(
@@ -139,6 +145,7 @@ export default function AdminDashboard() {
 
   const handleSave = () => {
     if (!form.name.trim()) return alert("Name is required");
+
     const isHospital = modal.type.includes("Hospital");
     const isAdd = modal.type.includes("add");
 
@@ -153,6 +160,7 @@ export default function AdminDashboard() {
           .map((s) => s.trim())
           .filter(Boolean),
       };
+
       setHospitals(
         isAdd
           ? [...hospitals, data]
@@ -162,6 +170,7 @@ export default function AdminDashboard() {
       if (!form.hospitalId) return alert("Please select a hospital");
       const hospital = hospitals.find((h) => h.id === Number(form.hospitalId));
       if (!hospital) return alert("Hospital not found");
+
       const data = {
         id: isAdd ? Date.now() : modal.item.id,
         name: form.name,
@@ -174,6 +183,7 @@ export default function AdminDashboard() {
         bio: form.bio,
         image: form.image,
       };
+
       setAdminDoctors(
         isAdd
           ? [...adminDoctors, data]
@@ -185,6 +195,7 @@ export default function AdminDashboard() {
 
   const handleDelete = (type, id) => {
     if (!window.confirm(`Delete this ${type}?`)) return;
+
     if (type === "hospital") setHospitals(hospitals.filter((h) => h.id !== id));
     if (type === "doctor")
       setAdminDoctors(adminDoctors.filter((d) => d.id !== id));
@@ -200,12 +211,12 @@ export default function AdminDashboard() {
   });
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f5f5f5" }}>
-      {/* ── Sidebar ── */}
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f8fafd" }}>
+      {/* Sidebar */}
       <Box
         sx={{
           width: 260,
-          bgcolor: "#1a3c5e",
+          bgcolor: "#0f2a4a",
           color: "white",
           p: 3,
           flexShrink: 0,
@@ -213,10 +224,12 @@ export default function AdminDashboard() {
       >
         <Typography
           variant="h6"
-          sx={{ mb: 4, fontWeight: "bold", textAlign: "center" }}
+          fontWeight="bold"
+          sx={{ mb: 4, textAlign: "center" }}
         >
           Admin Dashboard
         </Typography>
+
         <List>
           {SIDEBAR_ITEMS.map(({ label, value, icon }) => (
             <ListItem
@@ -224,51 +237,50 @@ export default function AdminDashboard() {
               key={value}
               onClick={() => setTab(value)}
               sx={{
-                bgcolor: tab === value ? "#2c5282" : "transparent",
-                borderRadius: 1,
+                bgcolor: tab === value ? "#1e4a7a" : "transparent",
+                borderRadius: 2,
                 mb: 1,
-                cursor: "pointer",
+                "&:hover": { bgcolor: "#1e4a7a" },
               }}
             >
-              <ListItemIcon sx={{ color: "white", minWidth: 36 }}>
+              <ListItemIcon sx={{ color: "white", minWidth: 40 }}>
                 {icon}
               </ListItemIcon>
               <ListItemText primary={label} />
             </ListItem>
           ))}
         </List>
-        <Divider sx={{ bgcolor: "rgba(255,255,255,0.2)", my: 2 }} />
+
+        <Divider sx={{ bgcolor: "rgba(255,255,255,0.2)", my: 3 }} />
+
         <Button
           fullWidth
           variant="outlined"
           color="inherit"
-          onClick={() => {
-            localStorage.removeItem("isAdminLoggedIn");
-            navigate("/admin/login");
-          }}
+          onClick={logout}
+          sx={{ borderColor: "white", color: "white" }}
         >
           Logout
         </Button>
       </Box>
 
-      {}
-      <Box sx={{ flex: 1, p: 4, overflow: "auto" }}>
-        {}
+      {/* Main Content */}
+      <Box sx={{ flex: 1, p: 5, overflow: "auto" }}>
         {tab === "dashboard" && (
           <>
-            <Typography variant="h5" fontWeight="bold" sx={{ mb: 3 }}>
+            <Typography variant="h4" fontWeight="bold" sx={{ mb: 4 }}>
               Overview
             </Typography>
             <Grid container spacing={3}>
               {[
                 {
-                  label: "Hospitals",
+                  label: "Total Hospitals",
                   value: hospitals.length,
                   color: "#1976d2",
                   icon: <LocalHospitalIcon sx={{ fontSize: 40 }} />,
                 },
                 {
-                  label: "Doctors",
+                  label: "Total Doctors",
                   value: allDoctors.length,
                   color: "#388e3c",
                   icon: <PersonIcon sx={{ fontSize: 40 }} />,
@@ -279,25 +291,29 @@ export default function AdminDashboard() {
                   color: "#f57c00",
                   icon: <CalendarMonthIcon sx={{ fontSize: 40 }} />,
                 },
-              ].map(({ label, value, color, icon }) => (
-                <Grid item xs={12} sm={4} key={label}>
-                  <Card elevation={3} sx={{ borderRadius: 3 }}>
+              ].map((item, index) => (
+                <Grid item xs={12} sm={4} key={index}>
+                  <Card sx={{ borderRadius: 4, boxShadow: 3 }}>
                     <CardContent
                       sx={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 2,
-                        p: 3,
+                        gap: 3,
+                        p: 4,
                       }}
                     >
-                      <Avatar sx={{ bgcolor: color, width: 60, height: 60 }}>
-                        {icon}
+                      <Avatar
+                        sx={{ bgcolor: item.color, width: 70, height: 70 }}
+                      >
+                        {item.icon}
                       </Avatar>
                       <Box>
-                        <Typography variant="h4" fontWeight="bold">
-                          {value}
+                        <Typography variant="h3" fontWeight="bold">
+                          {item.value}
                         </Typography>
-                        <Typography color="text.secondary">{label}</Typography>
+                        <Typography color="text.secondary" variant="h6">
+                          {item.label}
+                        </Typography>
                       </Box>
                     </CardContent>
                   </Card>
@@ -307,23 +323,29 @@ export default function AdminDashboard() {
           </>
         )}
 
-        {}
+        {/* Hospitals Tab */}
         {tab === "hospitals" && (
-          <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
+          <Paper elevation={3} sx={{ p: 4, borderRadius: 4 }}>
             <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 3,
+              }}
             >
-              <Typography variant="h6" fontWeight="bold">
-                Hospitals
+              <Typography variant="h5" fontWeight="bold">
+                Hospitals Management
               </Typography>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => openModal("addHospital")}
               >
-                Add Hospital
+                Add New Hospital
               </Button>
             </Box>
+
             <TableContainer>
               <Table>
                 <THead
@@ -366,13 +388,18 @@ export default function AdminDashboard() {
           </Paper>
         )}
 
-        {/* Doctors */}
+        {/* Doctors Tab */}
         {tab === "doctors" && (
-          <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
+          <Paper elevation={3} sx={{ p: 4, borderRadius: 4 }}>
             <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 3,
+              }}
             >
-              <Typography variant="h6" fontWeight="bold">
+              <Typography variant="h5" fontWeight="bold">
                 Doctors ({allDoctors.length})
               </Typography>
               <Button
@@ -380,9 +407,10 @@ export default function AdminDashboard() {
                 startIcon={<AddIcon />}
                 onClick={() => openModal("addDoctor")}
               >
-                Add Doctor
+                Add New Doctor
               </Button>
             </Box>
+
             <TableContainer>
               <Table>
                 <THead
@@ -439,12 +467,13 @@ export default function AdminDashboard() {
           </Paper>
         )}
 
-        {/* Appointments */}
+        {/* Appointments Tab */}
         {tab === "appointments" && (
-          <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>
-              Appointments
+          <Paper elevation={3} sx={{ p: 4, borderRadius: 4 }}>
+            <Typography variant="h5" fontWeight="bold" sx={{ mb: 3 }}>
+              All Appointments ({appointments.length})
             </Typography>
+
             <TableContainer>
               <Table>
                 <THead
@@ -461,24 +490,20 @@ export default function AdminDashboard() {
                 <TableBody>
                   {appointments.length === 0 ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        align="center"
-                        sx={{ py: 8, color: "text.secondary" }}
-                      >
-                        No appointments yet
+                      <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                        No appointments found
                       </TableCell>
                     </TableRow>
                   ) : (
                     appointments.map((a) => (
                       <TableRow key={a.id} hover>
-                        <TableCell>{a.patientName || "—"}</TableCell>
-                        <TableCell>{a.doctorName || "—"}</TableCell>
-                        <TableCell>{a.hospitalName || "—"}</TableCell>
+                        <TableCell>{a.patientName}</TableCell>
+                        <TableCell>{a.doctorName}</TableCell>
+                        <TableCell>{a.hospitalName}</TableCell>
                         <TableCell>
-                          <strong>{a.preferredTime || "—"}</strong>
+                          <strong>{a.preferredTime}</strong>
                         </TableCell>
-                        <TableCell>{a.date || "—"}</TableCell>
+                        <TableCell>{a.date}</TableCell>
                         <TableCell>
                           <StatusChip status={a.status} />
                         </TableCell>
@@ -486,9 +511,6 @@ export default function AdminDashboard() {
                           <Button
                             size="small"
                             variant="outlined"
-                            color={
-                              a.status === "Scheduled" ? "success" : "warning"
-                            }
                             onClick={() =>
                               setAppointments(
                                 appointments.map((x) =>
@@ -505,7 +527,9 @@ export default function AdminDashboard() {
                               )
                             }
                           >
-                            {a.status === "Scheduled" ? "Complete" : "Reopen"}
+                            {a.status === "Scheduled"
+                              ? "Mark Complete"
+                              : "Reopen"}
                           </Button>
                           <IconButton
                             color="error"
@@ -524,14 +548,14 @@ export default function AdminDashboard() {
         )}
       </Box>
 
-      {}
+      {/* Add/Edit Modal */}
       <Dialog
         open={modal.open}
         onClose={() => setModal({ ...modal, open: false })}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ fontWeight: "bold" }}>
+        <DialogTitle>
           {modal.type.includes("add") ? "Add" : "Edit"}{" "}
           {modal.type.includes("Hospital") ? "Hospital" : "Doctor"}
         </DialogTitle>
@@ -555,27 +579,17 @@ export default function AdminDashboard() {
               <TextField {...field("specialty")} label="Specialty" />
               <TextField
                 {...field("experience")}
-                label="Experience (e.g. 5 years)"
+                label="Experience (e.g. 10 years)"
               />
-              <TextField
-                {...field("qualification")}
-                label="Qualification (e.g. MBBS, MD)"
-              />
-              <TextField
-                {...field("availability")}
-                label="Availability (e.g. Mon–Fri 9AM–5PM)"
-              />
-              <TextField
-                {...field("bio")}
-                label="Bio / About"
-                multiline
-                rows={3}
-              />
+              <TextField {...field("qualification")} label="Qualification" />
+              <TextField {...field("availability")} label="Availability" />
+              <TextField {...field("bio")} label="Bio" multiline rows={3} />
               <TextField
                 {...field("image")}
-                label="Photo URL (optional)"
-                placeholder="https://..."
+                label="Image URL (optional)"
+                placeholder="https://"
               />
+
               <FormControl fullWidth sx={{ mt: 2 }}>
                 <InputLabel>Hospital</InputLabel>
                 <Select
@@ -595,7 +609,7 @@ export default function AdminDashboard() {
             </>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions>
           <Button onClick={() => setModal({ ...modal, open: false })}>
             Cancel
           </Button>
