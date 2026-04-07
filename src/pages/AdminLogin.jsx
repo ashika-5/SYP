@@ -1,105 +1,232 @@
-// src/pages/AdminLogin.jsx
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import {
-  Container,
-  Paper,
+  Box,
   Typography,
   TextField,
   Button,
-  Box,
+  Paper,
+  InputAdornment,
+  IconButton,
   Alert,
+  CircularProgress,
 } from "@mui/material";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import EmailIcon from "@mui/icons-material/Email";
 import LockIcon from "@mui/icons-material/Lock";
-import { useAuth } from "../context/AuthContext";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
-const ADMIN_CREDENTIALS = {
-  username: "admin",
-  password: "admin123",
-};
+const PRIMARY = "#1976d2";
+const PRIMARY_DARK = "#1565c0";
+
+// Admin credentials
+const ADMIN_EMAIL = "admin@medicare.com";
+const ADMIN_PASSWORD = "admin123";
 
 export default function AdminLogin() {
-  const [credentials, setCredentials] = useState({
-    username: "",
-    password: "",
-  });
-  const [error, setError] = useState("");
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleChange = (e) => {
-    setCredentials({ ...credentials, [e.target.name]: e.target.value });
+  useEffect(() => {
+    if (localStorage.getItem("isAdminLoggedIn") === "true") {
+      navigate("/admin/dashboard");
+    }
+  }, [navigate]);
+
+  const handleLogin = () => {
     setError("");
+    if (!form.email || !form.password) {
+      setError("Please fill all fields.");
+      return;
+    }
+    if (form.email !== ADMIN_EMAIL || form.password !== ADMIN_PASSWORD) {
+      setError("Invalid admin credentials.");
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      localStorage.setItem("isAdminLoggedIn", "true");
+      navigate("/admin/dashboard");
+    }, 1000);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    if (
-      credentials.username === ADMIN_CREDENTIALS.username &&
-      credentials.password === ADMIN_CREDENTIALS.password
-    ) {
-      login(null, true); // true = admin login
-      navigate("/admin/dashboard");
-    } else {
-      setError("Invalid username or password");
-    }
+  const fieldSx = {
+    mb: 2.5,
+    "& .MuiOutlinedInput-root": {
+      borderRadius: 2,
+      "&.Mui-focused fieldset": { borderColor: PRIMARY },
+    },
+    "& label.Mui-focused": { color: PRIMARY },
   };
 
   return (
-    <Container maxWidth="sm" sx={{ py: 10 }}>
-      <Paper elevation={6} sx={{ p: 5, borderRadius: 4, textAlign: "center" }}>
-        <Box sx={{ mb: 4 }}>
-          <LockIcon sx={{ fontSize: 60, color: "#1976d2" }} />
-          <Typography variant="h4" fontWeight={700} sx={{ mt: 2 }}>
-            Admin Login
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(135deg, #0d1b2a 0%, #1a2f4e 50%, #1565c0 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        p: 2,
+      }}
+    >
+      <Box sx={{ width: "100%", maxWidth: 420 }}>
+        {/* Logo */}
+        <Box sx={{ textAlign: "center", mb: 3 }}>
+          <Box
+            sx={{
+              width: 72,
+              height: 72,
+              borderRadius: "50%",
+              bgcolor: "rgba(255,255,255,0.1)",
+              border: "2px solid rgba(255,255,255,0.2)",
+              mx: "auto",
+              mb: 1.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <AdminPanelSettingsIcon sx={{ fontSize: 40, color: "white" }} />
+          </Box>
+          <Typography variant="h5" color="white" fontWeight={800}>
+            Admin Portal
           </Typography>
-          <Typography color="text.secondary">Access Admin Dashboard</Typography>
+          <Typography
+            variant="body2"
+            sx={{ color: "rgba(255,255,255,0.6)", mt: 0.5 }}
+          >
+            MediCare Hospital System
+          </Typography>
         </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: 4,
+            p: 4,
+            boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            bgcolor: "rgba(255,255,255,0.97)",
+          }}
+        >
+          <Typography variant="h6" fontWeight={700} mb={0.5} color="#0d2a2a">
+            Administrator Login
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Restricted access — authorized personnel only
+          </Typography>
 
-        <form onSubmit={handleSubmit}>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2 }}>
+              {error}
+            </Alert>
+          )}
+
           <TextField
             fullWidth
-            label="Username"
-            name="username"
-            value={credentials.username}
-            onChange={handleChange}
-            margin="normal"
-            required
+            label="Admin Email"
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            sx={fieldSx}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <EmailIcon sx={{ color: PRIMARY, fontSize: 20 }} />
+                </InputAdornment>
+              ),
+            }}
           />
+
           <TextField
             fullWidth
             label="Password"
-            name="password"
-            type="password"
-            value={credentials.password}
-            onChange={handleChange}
-            margin="normal"
-            required
+            type={showPass ? "text" : "password"}
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+            sx={fieldSx}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <LockIcon sx={{ color: PRIMARY, fontSize: 20 }} />
+                </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowPass(!showPass)} edge="end">
+                    {showPass ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
 
+          {/* Hint box */}
+          <Box
+            sx={{
+              mb: 2.5,
+              p: 1.5,
+              borderRadius: 2,
+              bgcolor: "#e3f2fd",
+              border: "1px solid rgba(25,118,210,0.2)",
+            }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              <strong>Test credentials:</strong>
+              <br />
+              Email: <strong>admin@medicare.com</strong>
+              <br />
+              Password: <strong>admin123</strong>
+            </Typography>
+          </Box>
+
           <Button
-            type="submit"
             fullWidth
             variant="contained"
             size="large"
-            sx={{ mt: 4, py: 1.5, borderRadius: 3, fontWeight: 600 }}
+            onClick={handleLogin}
+            disabled={loading}
+            sx={{
+              borderRadius: 3,
+              py: 1.5,
+              fontWeight: 700,
+              fontSize: 15,
+              background: `linear-gradient(90deg, ${PRIMARY_DARK}, ${PRIMARY})`,
+              boxShadow: "0 4px 16px rgba(25,118,210,0.3)",
+              "&:hover": {
+                background: `linear-gradient(90deg, #0d47a1, ${PRIMARY_DARK})`,
+              },
+            }}
           >
-            Login as Admin
+            {loading ? (
+              <CircularProgress size={22} color="inherit" />
+            ) : (
+              "Login as Admin"
+            )}
           </Button>
-        </form>
 
-        <Typography variant="body2" sx={{ mt: 3, color: "text.secondary" }}>
-          Default: username = <strong>admin</strong>, password ={" "}
-          <strong>admin123</strong>
-        </Typography>
-      </Paper>
-    </Container>
+          <Typography
+            variant="body2"
+            align="center"
+            mt={2.5}
+            color="text.secondary"
+          >
+            Patient?{" "}
+            <Link
+              to="/patient/login"
+              style={{ color: PRIMARY, fontWeight: 600 }}
+            >
+              Login here
+            </Link>
+          </Typography>
+        </Paper>
+      </Box>
+    </Box>
   );
 }

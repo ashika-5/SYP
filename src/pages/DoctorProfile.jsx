@@ -37,8 +37,7 @@ import LoginIcon from "@mui/icons-material/Login";
 import { doctors as STATIC_DOCTORS } from "../data/doctors";
 import PaymentDialog from "../components/PaymentDialog";
 import BookingConfirmation from "../components/BookingConfirmation";
-import { useNotify } from "../context/NotificationContext";
-import { useAuth } from "../context/AuthContext";
+// useNotify and useAuth replaced with localStorage-based auth (no context required)
 
 const PRIMARY = "#1976d2";
 const PRIMARY_DARK = "#1565c0";
@@ -138,8 +137,21 @@ const FormField = ({
 export default function DoctorProfile() {
   const { doctorId } = useParams();
   const navigate = useNavigate();
-  const notify = useNotify();
-  const { currentUser } = useAuth();
+  const isPatientLoggedIn =
+    localStorage.getItem("isPatientLoggedIn") === "true";
+  const currentUser = isPatientLoggedIn
+    ? {
+        fullName: localStorage.getItem("patientName") || "",
+        email: localStorage.getItem("patientEmail") || "",
+      }
+    : null;
+
+  // Simple snackbar-free notify: uses console + alert fallback
+  const notify = (msg, type) => {
+    // If you add a toast library later, hook it here.
+    // For now, non-blocking log so the app doesn't crash.
+    console.log(`[${type}] ${msg}`);
+  };
 
   const allDoctors = [
     ...STATIC_DOCTORS,
