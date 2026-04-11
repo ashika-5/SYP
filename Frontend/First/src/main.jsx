@@ -7,5 +7,6 @@ const root = createRoot(document.getElementById("root")); // must match index.ht
 root.render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );
+

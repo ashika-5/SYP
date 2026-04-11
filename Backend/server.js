@@ -3,10 +3,10 @@ const cors = require("cors");
 require("dotenv").config();
 
 // Import routes
-const authRoutes = require("./routes/authRoutes");
-const hospitalRoutes = require("./routes/hospitalRoutes");
-const doctorRoutes = require("./routes/doctorRoutes");
-const appointmentRoutes = require("./routes/appointmentRoutes");
+const authRoutes = require("./src/routes/authRoutes");
+const hospitalRoutes = require("./src/routes/hospitalRoutes");
+const doctorRoutes = require("./src/routes/doctorRoutes");
+const appointmentRoutes = require("./src/routes/appointmentRoutes");
 
 const app = express();
 
